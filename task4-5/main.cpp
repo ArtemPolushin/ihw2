@@ -45,29 +45,31 @@ int main() {
     ftruncate(sharedMemoryFd, sizeof(SharedMemory));
     SharedMemory* sharedData = static_cast<SharedMemory*>(mmap(nullptr, sizeof(SharedMemory), PROT_READ | PROT_WRITE, MAP_SHARED, sharedMemoryFd, 0));
     for (int m = 0; m < M; ++m) {
-        pid_t childPid = fork();
-        if (childPid == 0) {
-            if (sem_wait(p_sem) == -1) {
-                perror("sem_wait: Incorrect wait of posix semaphore");
-                exit(-1);
-            };
-            for (int n = 0; n < N; ++n) {
+        for (int n = 0; n < N; ++n) {
+            pid_t childPid = fork();
+            if (childPid == 0) {
+                if (sem_wait(p_sem) == -1) {
+                    perror("sem_wait: Incorrect wait of posix semaphore");
+                    exit(-1);
+                };
                 for (int k = 0; k < K; ++k) {
                     sharedData->catalog[m][n][k] = v[m * N * K + n * K + k];
                 }
-            }
-            if (sem_post(p_sem) == -1) {
-                perror("sem_post: Incorrect post of posix semaphore");
+                if (sem_post(p_sem) == -1) {
+                    perror("sem_post: Incorrect post of posix semaphore");
+                    exit(-1);
+                };
+                exit(0);
+            } else if (childPid == -1) {
+                perror("Error creating child process");
                 exit(-1);
-            };
-            exit(0);
-        } else if (childPid == -1) {
-            perror("Error creating child process");
-            exit(-1);
+            }
         }
     }
     for (int m = 0; m < M; ++m) {
-        wait(0);
+        for (int n = 0; n < N; ++n) {
+            wait(0);
+        }
     }
     for (int m = 0; m < M; ++m) {
         std::cout << "Ряд " << m + 1 << ":\n";
